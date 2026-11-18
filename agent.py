@@ -44,7 +44,7 @@ FULL DATASET CONTEXT SUMMARY:
 def ask_sector_analyst(user_question: str, api_key: str) -> str:
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model="gemini-3.8-flash",
+        model="gemini-2.5-flash",
         contents=user_question,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
