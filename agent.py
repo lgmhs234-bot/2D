@@ -41,15 +41,31 @@ FULL DATASET CONTEXT SUMMARY:
 {dataset_digest}
 """
 
+MODELS_TO_TRY = [
+    "gemini-4-hydrogen",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+]
+
 def ask_sector_analyst(user_question: str, api_key: str) -> str:
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model="gemini-4-hydrogen",
-        contents=user_question,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            tools=[run_pandas_analysis],
-            temperature=0.2,
-        ),
-    )
-    return response.text
+    last_error = None
+
+    for model_name in MODELS_TO_TRY:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=user_question,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    tools=[run_pandas_analysis],
+                    temperature=0.2,
+                ),
+            )
+            if response.text:
+                return response.text
+        except Exception as e:
+            last_error = e
+            continue
+
+    raise RuntimeError(f"All fallback models failed. Last error: {last_error}")
