@@ -4,14 +4,15 @@ import pandas as pd
 from google import genai
 from google.genai import types
 
-# Load full cleaned dataset (all 292 rows remain available inside `df`)
+# Load full cleaned dataset (all rows stay in `df` for analysis)
 df = pd.read_csv("cleaned_2d_sector_dataset.csv")
 
 
 def run_pandas_analysis(code: str) -> str:
-    """
-    Executes pandas/python code against dataframe `df` and returns the result.
-    Always assign your final output to a variable named `result`.
+    """Executes pandas code against dataframe `df` and returns `result`.
+
+    Args:
+        code: Python snippet using `df` and `pd` that assigns output to `result`.
     """
     local_vars = {"df": df, "pd": pd}
     try:
@@ -21,36 +22,38 @@ def run_pandas_analysis(code: str) -> str:
         return f"Error executing code: {e}"
 
 
-# Keep system prompt compact (schema + 3 sample rows) to avoid heavy payloads
 digest_cols = [
-    "shortCode", "ownerUsername", "views", "likes", "comments",
-    "outlier_index", "performance_tier", "discussion_rate_per_1k",
-    "videoDuration", "caption", "top_comments"
+    "shortCode",
+    "ownerUsername",
+    "views",
+    "likes",
+    "comments",
+    "outlier_index",
+    "performance_tier",
+    "discussion_rate_per_1k",
+    "videoDuration",
+    "caption",
+    "top_comments",
 ]
-sample_preview = df[digest_cols].head(3).to_csv(index=False)
+available_digest_cols = [c for c in digest_cols if c in df.columns]
+sample_preview = df[available_digest_cols].head(3).to_csv(index=False)
+
+creator_count = df["ownerUsername"].nunique() if "ownerUsername" in df.columns else "multiple"
 
 SYSTEM_PROMPT = f"""
-You are an expert 2D Animation Sector Intelligence AI advising the Instagram channel @vichardesk.
-You have access to a pandas DataFrame `df` with {len(df)} Reels across {df['ownerUsername'].nunique()} benchmark creators.
+You are a data analyst for the Instagram channel @vichardesk covering {len(df)} Reels across {creator_count} creators.
+Columns in `df`: {list(df.columns)}
+- `outlier_index`: Video Views / Channel Median Views
+- `discussion_rate_per_1k`: (Comments / Views) * 1000
 
-COLUMNS AVAILABLE IN `df`:
-{list(df.columns)}
+Call `run_pandas_analysis` once or twice at most when numbers, filters, rankings, or text searches on `df` are needed, assign final output to `result`, and then give a clear answer.
 
-METRICS DEFINITIONS:
-- `outlier_index`: Video Views / Channel Median Views.
-- `discussion_rate_per_1k`: (Comments / Views) * 1000.
-
-RULES:
-1. ALWAYS use the `run_pandas_analysis` tool for numbers, rankings, averages, filters, text searches, or correlations across `df`, and assign the final output to `result`.
-2. Combine exact quantitative results from `df` with concise qualitative takeaways.
-
-SAMPLE ROWS (first 3 rows for format reference):
+Sample rows:
 {sample_preview}
 """
 
 MODELS_TO_TRY = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
 ]
 
@@ -60,7 +63,10 @@ def ask_sector_analyst(user_question: str, api_key: str) -> str:
     if not clean_key:
         return "Please enter your API key in the sidebar first."
 
-    client = genai.Client(api_key=clean_key)
+    client = genai.Client(
+        api_key=clean_key,
+        http_options=types.HttpOptions(timeout=25_000),
+    )
     errors = []
 
     for model_name in MODELS_TO_TRY:
@@ -72,20 +78,21 @@ def ask_sector_analyst(user_question: str, api_key: str) -> str:
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_PROMPT,
                         tools=[run_pandas_analysis],
+                        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                            maximum_remote_calls=2
+                        ),
                         temperature=0.2,
                     ),
                 )
                 if response.text:
                     return response.text
+                errors.append(f"{model_name} (try {attempt + 1}): Empty text response")
             except Exception as e:
                 err_str = str(e)
                 errors.append(f"{model_name} (try {attempt + 1}): {err_str}")
                 if "503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str:
-                    time.sleep(1.5 * (attempt + 1) + random.uniform(0.1, 0.5))
+                    time.sleep(1.0 * (attempt + 1) + random.uniform(0.1, 0.4))
                     continue
                 break
 
-    return (
-        "All Gemini models hit errors or high demand:\n\n"
-        + "\n\n".join(errors[-4:])
-    )
+    return "Could not complete analysis:\n\n" + "\n\n".join(errors[-4:])
