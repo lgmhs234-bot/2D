@@ -5,7 +5,7 @@ from agent import ask_sector_analyst
 st.set_page_config(page_title="2D Animation Sector Intelligence", layout="wide")
 
 st.title("🎨 2D Animation Sector Intelligence Engine")
-st.markdown("AI-powered analytics and strategy assistant for **Vichaar Desk**.")
+st.markdown("AI-powered analytics and strategy assistant for **Vichar Desk**.")
 
 api_key = st.sidebar.text_input("Enter Gemini API Key:", type="password")
 
@@ -16,7 +16,7 @@ try:
     col1.metric("Total Reels Analyzed", len(df))
     col2.metric("Creators Tracked", df["ownerUsername"].nunique())
     col3.metric("Sector Median Views", f"{int(df['views'].median()):,}")
-    col4.metric("Vichaar Desk Median Views", f"{int(df[df['ownerUsername']=='vichardesk']['views'].median()):,}")
+    col4.metric("Vichar Desk Median Views", f"{int(df[df['ownerUsername']=='vichardesk']['views'].median()):,}")
     st.markdown("---")
     
 except Exception as e:
@@ -29,7 +29,7 @@ if "messages" not in st.session_state:
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-if prompt := st.chat_input("Ask about hook patterns, discussion rates, outlier formulas, or Vichaar Desk strategy..."):
+if prompt := st.chat_input("Ask about hook patterns, discussion rates, outlier formulas, or Vichar Desk strategy..."):
     if not api_key:
         st.warning("Please enter your Gemini API Key in the sidebar first!")
         st.stop()
